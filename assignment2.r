@@ -1,117 +1,92 @@
 # Install required packages if you haven't already
-# install.packages("readr")
-# install.packages("dplyr")
-# install.packages("caTools")
-# install.packages("rpart")
-# install.packages("caret")
-# install.packages("randomForest")
-# install.packages("ggplot2")
-# install.packages("class")
+install.packages("readr", "/home/shahzain/R-libraries")
+install.packages("dplyr","/home/shahzain/R-libraries")
+install.packages("caret", "/home/shahzain/R-libraries")
+install.packages("randomForest", "/home/shahzain/R-libraries")
+install.packages(c("ggplot2", "lattice", "data.table", "dplyr", "Matrix", "pROC", "tidyverse"), lib = "/home/shahzain/R-libraries")
 
 # Load required libraries
 library(readr)
 library(dplyr)
-library(caTools)
-library(rpart)
-library(caret)
-library(randomForest)
-library(ggplot2)
-library(class)
+library(caTools, lib.loc = "/home/shahzain/R-libraries")
+library(rpart, lib.loc = "/home/shahzain/R-libraries")
+library(caret, lib.loc = "/home/shahzain/R-libraries")
+library(ggplot2, lib.loc = "/home/shahzain/R-libraries")
+library(randomForest, lib.loc = "/home/shahzain/R-libraries")
+library(class)  # for k-NN
+library(pROC, lib.loc = "/home/shahzain/R-libraries")
 
-# Fetch the dataset from UCI
+# Load and preprocess the dataset
 url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data"
-
-# Load the dataset into R
 car_evaluation <- read_csv(url, col_names = FALSE)
 
-# Assign feature and target variables (assuming the last column is the target 'CAR')
+# Rename columns
 colnames(car_evaluation) <- c('buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety', 'car_acceptability')
+X <- car_evaluation %>% select(-car_acceptability)  # Features
+y <- car_evaluation$car_acceptability               # Target variable
 
-# Split the dataset into features and target
-X <- car_evaluation %>% select(-car_acceptability)
-y <- car_evaluation$car_acceptability
+# Another dataset
+url2 <- 'https://archive.ics.uci.edu/static/public/19/data.csv'
+columns <- c('buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety', 'class')
+data <- read_csv(url2, col_names = columns)
+str(data)
 
-# Split the data into training and testing sets (70% train, 30% test)
+# Encode categorical columns using factor()
+for (column in colnames(data)) {
+  data[[column]] <- as.numeric(factor(data[[column]]))
+}
+
+# Split data into training and testing sets
+X <- data[, !names(data) %in% 'class']
+y <- data$class
 set.seed(42)
 split <- sample.split(y, SplitRatio = 0.7)
-
 X_train <- X[split, ]
 X_test <- X[!split, ]
 y_train <- y[split]
 y_test <- y[!split]
 
-# Print training and test set sizes
-cat("Training set size:", nrow(X_train), "\n")
-cat("Test set size:", nrow(X_test), "\n")
-
-# Decision Tree model
+# Decision Tree Model
 dt_model <- rpart(y_train ~ ., data = X_train, method = "class", control = rpart.control(cp = 0, minsplit = 2))
-
-# Predictions using Decision Tree
 y_pred_dt <- predict(dt_model, X_test, type = "class")
-
-# Confusion matrix for Decision Tree
 confusionMatrix(factor(y_test), factor(y_pred_dt))
 
-# Random Forest model
+# Random Forest Model
 rf_model <- randomForest(as.factor(y_train) ~ ., data = X_train, ntree = 100)
-
-# Predictions using Random Forest
 y_pred_rf <- predict(rf_model, X_test)
+all_classes <- union(levels(as.factor(y_train)), levels(as.factor(y_test)))
+y_pred_rf <- factor(y_pred_rf, levels = all_classes)
+y_test <- factor(y_test, levels = all_classes)
+confusion_rf <- table(Predicted = y_pred_rf, Actual = y_test)
+accuracy <- sum(diag(confusion_rf)) / sum(confusion_rf)
+cat("Random Forest Accuracy:", accuracy, "\n")
 
-# Confusion Matrix for Random Forest
-confusion_rf <- table(Predicted = y_pred_rf, Actual = as.factor(y_test))
-print(confusion_rf)
-
-# Accuracy for Random Forest
-accuracy_rf <- sum(diag(confusion_rf)) / sum(confusion_rf)
-cat("Random Forest Accuracy:", accuracy_rf, "\n")
-
-# Precision, Recall, and F1-Score for Random Forest
-precision_rf <- diag(confusion_rf) / rowSums(confusion_rf)
-recall_rf <- diag(confusion_rf) / colSums(confusion_rf)
-f1_score_rf <- 2 * (precision_rf * recall_rf) / (precision_rf + recall_rf)
-
-# Combine metrics into a data frame for better viewing
-metrics_rf <- data.frame(
-  Class = names(precision_rf),
-  Precision = precision_rf,
-  Recall = recall_rf,
-  F1_Score = f1_score_rf
-)
-print(metrics_rf)
-
-# k-NN classification (k = 5)
+# k-Nearest Neighbors (k-NN)
 y_pred_knn <- knn(train = X_train, test = X_test, cl = as.factor(y_train), k = 5)
-
-# Confusion matrix for k-NN
 confusion_knn <- table(Predicted = y_pred_knn, Actual = as.factor(y_test))
-print(confusion_knn)
-
-# Check if the confusion matrix is square and print metrics
 if (nrow(confusion_knn) == ncol(confusion_knn)) {
-  confusion_metrics_knn <- confusionMatrix(confusion_knn)
-  print(confusion_metrics_knn)
+  confusion_metrics <- confusionMatrix(confusion_knn)
+  print(confusion_metrics)
 }
 
-# Calculate accuracy for Decision Tree
+# Accuracy Calculation for All Models
 acc_dt <- sum(y_pred_dt == y_test) / length(y_test)
-cat(sprintf("Decision Tree Accuracy: %.2f\n", acc_dt))
-
-# Calculate accuracy for k-NN
+acc_rf <- sum(y_pred_rf == y_test) / length(y_test)
 acc_knn <- sum(y_pred_knn == y_test) / length(y_test)
+cat(sprintf("Decision Tree Accuracy: %.2f\n", acc_dt))
+cat(sprintf("Random Forest Accuracy: %.2f\n", acc_rf))
 cat(sprintf("k-NN Accuracy: %.2f\n", acc_knn))
 
-# Feature importance for Random Forest
-importances <- rf_model$importance
-indices <- order(importances, decreasing = TRUE)
-
-# Prepare data for plotting feature importance
-importance_data <- data.frame(Feature = colnames(X_train)[indices], Importance = importances[indices])
-
-# Plot the feature importance
-ggplot(importance_data, aes(x = reorder(Feature, Importance), y = Importance)) +
-  geom_bar(stat = "identity") +
+# Feature Importance Plotting
+importance_rf <- as.data.frame(importance(rf_model))
+importance_rf$Feature <- rownames(importance_rf)
+ggplot(importance_rf, aes(x = reorder(Feature, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_bar(stat = "identity", fill = "forestgreen") +
   coord_flip() +
-  labs(title = "Feature Importance", x = "Features", y = "Importance") +
-  theme_minimal()
+  labs(title = "Feature Importance - Random Forest", x = "Features", y = "Importance")
+
+# ROC Curves
+dt_roc <- multiclass.roc(as.numeric(y_test), as.numeric(y_pred_dt))
+plot.roc(dt_roc$rocs[[1]], col = "blue", main = "Decision Tree ROC Curve")
+rf_roc <- multiclass.roc(as.numeric(y_test), as.numeric(y_pred_rf))
+plot.roc(rf_roc$rocs[[1]], col = "blue", main = "Random Forest ROC Curve")
