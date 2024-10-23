@@ -1,92 +1,181 @@
-# Install required packages if you haven't already
-install.packages("readr", "/home/shahzain/R-libraries")
-install.packages("dplyr","/home/shahzain/R-libraries")
-install.packages("caret", "/home/shahzain/R-libraries")
-install.packages("randomForest", "/home/shahzain/R-libraries")
-install.packages(c("ggplot2", "lattice", "data.table", "dplyr", "Matrix", "pROC", "tidyverse"), lib = "/home/shahzain/R-libraries")
-
-# Load required libraries
-library(readr)
-library(dplyr)
-library(caTools, lib.loc = "/home/shahzain/R-libraries")
-library(rpart, lib.loc = "/home/shahzain/R-libraries")
-library(caret, lib.loc = "/home/shahzain/R-libraries")
-library(ggplot2, lib.loc = "/home/shahzain/R-libraries")
-library(randomForest, lib.loc = "/home/shahzain/R-libraries")
-library(class)  # for k-NN
-library(pROC, lib.loc = "/home/shahzain/R-libraries")
-
-# Load and preprocess the dataset
-url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data"
-car_evaluation <- read_csv(url, col_names = FALSE)
-
-# Rename columns
-colnames(car_evaluation) <- c('buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety', 'car_acceptability')
-X <- car_evaluation %>% select(-car_acceptability)  # Features
-y <- car_evaluation$car_acceptability               # Target variable
-
-# Another dataset
-url2 <- 'https://archive.ics.uci.edu/static/public/19/data.csv'
-columns <- c('buying', 'maint', 'doors', 'persons', 'lug_boot', 'safety', 'class')
-data <- read_csv(url2, col_names = columns)
-str(data)
-
-# Encode categorical columns using factor()
-for (column in colnames(data)) {
-  data[[column]] <- as.numeric(factor(data[[column]]))
+# Function to install necessary packages
+install_required_packages <- function() {
+  install.packages("readr")
+  install.packages("dplyr")
+  # install.packages("caret")
+  install.packages("randomForest")
+  # install.packages(c("ggplot2", "lattice", "data.table", "dplyr", "Matrix", "pROC", "tidyverse"))
+  install.packages("curl")
+  install.packages("gargle")
+  # install.packages("googledrive")
+  install.packages("httr")
+  install.packages("ragg")
+  install.packages("rvest")
+  # install.packages("ggplot2")
+  # install.packages("googlesheets4")
+  install.packages("tidyverse")
+  # install.packages("caret")
+  install.packages("scales")
+  install.packages("ggplot2")
+  install.packages("caret")
 }
 
-# Split data into training and testing sets
-X <- data[, !names(data) %in% 'class']
-y <- data$class
-set.seed(42)
-split <- sample.split(y, SplitRatio = 0.7)
-X_train <- X[split, ]
-X_test <- X[!split, ]
-y_train <- y[split]
-y_test <- y[!split]
-
-# Decision Tree Model
-dt_model <- rpart(y_train ~ ., data = X_train, method = "class", control = rpart.control(cp = 0, minsplit = 2))
-y_pred_dt <- predict(dt_model, X_test, type = "class")
-confusionMatrix(factor(y_test), factor(y_pred_dt))
-
-# Random Forest Model
-rf_model <- randomForest(as.factor(y_train) ~ ., data = X_train, ntree = 100)
-y_pred_rf <- predict(rf_model, X_test)
-all_classes <- union(levels(as.factor(y_train)), levels(as.factor(y_test)))
-y_pred_rf <- factor(y_pred_rf, levels = all_classes)
-y_test <- factor(y_test, levels = all_classes)
-confusion_rf <- table(Predicted = y_pred_rf, Actual = y_test)
-accuracy <- sum(diag(confusion_rf)) / sum(confusion_rf)
-cat("Random Forest Accuracy:", accuracy, "\n")
-
-# k-Nearest Neighbors (k-NN)
-y_pred_knn <- knn(train = X_train, test = X_test, cl = as.factor(y_train), k = 5)
-confusion_knn <- table(Predicted = y_pred_knn, Actual = as.factor(y_test))
-if (nrow(confusion_knn) == ncol(confusion_knn)) {
-  confusion_metrics <- confusionMatrix(confusion_knn)
-  print(confusion_metrics)
+# Function to load required libraries
+load_libraries <- function() {
+  library(readr)
+  library(dplyr)
+  library(caTools)
+  library(rpart)
+  library(caret)
+  library(ggplot2)
+  library(randomForest)
+  library(class) # for k-NN
+  library(pROC)
 }
 
-# Accuracy Calculation for All Models
-acc_dt <- sum(y_pred_dt == y_test) / length(y_test)
-acc_rf <- sum(y_pred_rf == y_test) / length(y_test)
-acc_knn <- sum(y_pred_knn == y_test) / length(y_test)
-cat(sprintf("Decision Tree Accuracy: %.2f\n", acc_dt))
-cat(sprintf("Random Forest Accuracy: %.2f\n", acc_rf))
-cat(sprintf("k-NN Accuracy: %.2f\n", acc_knn))
+# Function to load and preprocess the dataset
+load_and_preprocess_data <- function(url, columns) {
+  data <- read_csv(url, col_names = columns)
+  for (column in colnames(data)) {
+    data[[column]] <- as.numeric(factor(data[[column]]))
+  }
+  return(data)
+}
 
-# Feature Importance Plotting
-importance_rf <- as.data.frame(importance(rf_model))
-importance_rf$Feature <- rownames(importance_rf)
-ggplot(importance_rf, aes(x = reorder(Feature, MeanDecreaseGini), y = MeanDecreaseGini)) +
-  geom_bar(stat = "identity", fill = "forestgreen") +
-  coord_flip() +
-  labs(title = "Feature Importance - Random Forest", x = "Features", y = "Importance")
+# Function to split data into training and testing sets
+split_data <- function(data, target_column, split_ratio = 0.7) {
+  X <- data[, !names(data) %in% target_column]
+  y <- data[[target_column]]
+  set.seed(42)
+  split <- sample.split(y, SplitRatio = split_ratio)
+  X_train <- X[split, ]
+  X_test <- X[!split, ]
+  y_train <- y[split]
+  y_test <- y[!split]
+  return(list(X_train = X_train, X_test = X_test, y_train = y_train, y_test = y_test))
+}
 
-# ROC Curves
-dt_roc <- multiclass.roc(as.numeric(y_test), as.numeric(y_pred_dt))
-plot.roc(dt_roc$rocs[[1]], col = "blue", main = "Decision Tree ROC Curve")
-rf_roc <- multiclass.roc(as.numeric(y_test), as.numeric(y_pred_rf))
-plot.roc(rf_roc$rocs[[1]], col = "blue", main = "Random Forest ROC Curve")
+# Function to train and evaluate Decision Tree model
+train_decision_tree <- function(X_train, y_train, X_test, y_test) {
+  dt_model <- rpart(y_train ~ ., data = X_train, method = "class", control = rpart.control(cp = 0, minsplit = 2))
+  y_pred <- predict(dt_model, X_test, type = "class")
+  accuracy <- sum(y_pred == y_test) / length(y_test)
+  cat(sprintf("Decision Tree Accuracy: %.2f\n", accuracy))
+  return(list(model = dt_model, accuracy = accuracy))
+}
+
+# Function to train and evaluate Random Forest model
+
+
+train_random_forest <- function(X_train, y_train, X_test, y_test) {
+  rf_model <- randomForest(as.factor(y_train) ~ ., data = X_train, ntree = 100)
+  y_pred <- predict(rf_model, X_test)
+
+  # Ensure the factor levels of y_pred and y_test are consistent
+  all_classes <- union(levels(as.factor(y_train)), levels(as.factor(y_test)))
+  y_pred <- factor(y_pred, levels = all_classes)
+  y_test <- factor(y_test, levels = all_classes)
+
+  confusion <- table(Predicted = y_pred, Actual = y_test)
+  accuracy <- sum(diag(confusion)) / sum(confusion)
+  cat("Random Forest Accuracy:", accuracy, "\n")
+  return(list(model = rf_model, accuracy = accuracy))
+}
+
+# Function to train and evaluate k-NN model
+train_knn <- function(X_train, y_train, X_test, y_test, k = 5) {
+  y_pred <- knn(train = X_train, test = X_test, cl = as.factor(y_train), k = k)
+  accuracy <- sum(y_pred == y_test) / length(y_test)
+  cat(sprintf("k-NN Accuracy: %.2f\n", accuracy))
+  return(list(predictions = y_pred, accuracy = accuracy))
+}
+
+# Function to plot feature importance for Random Forest
+plot_feature_importance <- function(rf_model) {
+  importance_rf <- as.data.frame(importance(rf_model))
+  importance_rf$Feature <- rownames(importance_rf)
+  ggplot(importance_rf, aes(x = reorder(Feature, MeanDecreaseGini), y = MeanDecreaseGini)) +
+    geom_bar(stat = "identity", fill = "forestgreen") +
+    coord_flip() +
+    labs(title = "Feature Importance - Random Forest", x = "Features", y = "Importance")
+}
+
+# Function to plot ROC curves for models
+plot_roc_curve <- function(y_test, y_pred, model_name) {
+  roc_obj <- multiclass.roc(as.numeric(y_test), as.numeric(y_pred))
+  plot.roc(roc_obj$rocs[[1]], col = "blue", main = paste(model_name, "ROC Curve"))
+}
+
+plot_roc_curve <- function(y_test, y_pred, model_name) {
+  y_test_numeric <- as.numeric(as.factor(y_test))
+  y_pred_numeric <- as.numeric(as.factor(y_pred))
+  roc_obj <- multiclass.roc(y_test_numeric, y_pred_numeric)
+  plot.roc(roc_obj$rocs[[1]], col = "blue", main = paste(model_name, "ROC Curve"))
+}
+
+# Main Execution
+install_required_packages()
+load_libraries()
+
+# URLs and columns
+url1 <- "https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data"
+url2 <- "https://archive.ics.uci.edu/static/public/19/data.csv"
+columns2 <- c("buying", "maint", "doors", "persons", "lug_boot", "safety", "class")
+
+# Function to load and preprocess the dataset
+load_and_preprocess_data <- function(url, columns) {
+  data <- read_csv(url, col_names = columns)
+  for (column in colnames(data)) {
+    data[[column]] <- as.numeric(factor(data[[column]]))
+  }
+  return(as.data.frame(data))
+}
+
+# Function to split data into training and testing sets
+split_data <- function(data, target_column, split_ratio = 0.7) {
+  X <- data[, !names(data) %in% target_column]
+  y <- as.vector(unlist(data[[target_column]])) # Ensure y is a vector
+  set.seed(42)
+  split <- sample.split(y, SplitRatio = split_ratio)
+  X_train <- X[split, ]
+  X_test <- X[!split, ]
+  y_train <- y[split]
+  y_test <- y[!split]
+  return(list(X_train = X_train, X_test = X_test, y_train = y_train, y_test = y_test))
+}
+
+# Function to train and evaluate k-NN model
+train_knn <- function(X_train, y_train, X_test, y_test, k = 5) {
+  X_train <- as.data.frame(X_train)
+  X_test <- as.data.frame(X_test)
+  y_train <- as.factor(y_train)
+  y_test <- as.factor(y_test)
+
+  y_pred <- knn(train = X_train, test = X_test, cl = y_train, k = k)
+  accuracy <- sum(y_pred == y_test) / length(y_test)
+  cat(sprintf("k-NN Accuracy: %.2f\n", accuracy))
+  return(list(predictions = y_pred, accuracy = accuracy))
+}
+
+# Main Execution - Ensure Proper Installation and Loading of Packages
+install_required_packages()
+load_libraries()
+
+# URLs and columns
+url2 <- "https://archive.ics.uci.edu/static/public/19/data.csv"
+columns2 <- c("buying", "maint", "doors", "persons", "lug_boot", "safety", "class")
+
+# Load and preprocess data
+data <- load_and_preprocess_data(url2, columns2)
+
+# Split data
+splits <- split_data(data, target_column = "class")
+X_train <- splits$X_train
+X_test <- splits$X_test
+y_train <- splits$y_train
+y_test <- splits$y_test
+
+# Train models
+dt_results <- train_decision_tree(X_train, y_train, X_test, y_test)
+rf_results <- train_random_forest(X_train, y_train, X_test, y_test)
+knn_results <- train_knn(X_train, y_train, X_test, y_test, k = 5)
