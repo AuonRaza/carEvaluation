@@ -117,11 +117,6 @@ plot_roc_curve <- function(y_test, y_pred, model_name) {
 install_required_packages()
 load_libraries()
 
-# URLs and columns
-url1 <- "https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data"
-url2 <- "https://archive.ics.uci.edu/static/public/19/data.csv"
-columns2 <- c("buying", "maint", "doors", "persons", "lug_boot", "safety", "class")
-
 # Function to load and preprocess the dataset
 load_and_preprocess_data <- function(url, columns) {
   data <- read_csv(url, col_names = columns)
@@ -162,11 +157,12 @@ install_required_packages()
 load_libraries()
 
 # URLs and columns
-url2 <- "https://archive.ics.uci.edu/static/public/19/data.csv"
-columns2 <- c("buying", "maint", "doors", "persons", "lug_boot", "safety", "class")
+url <- "https://archive.ics.uci.edu/static/public/19/data.csv"
+columns <- c("buying", "maint", "doors", "persons", "lug_boot", "safety", "class")
 
 # Load and preprocess data
-data <- load_and_preprocess_data(url2, columns2)
+data <- load_and_preprocess_data(url, columns)
+data <- data[-1, ]
 
 # Split data
 splits <- split_data(data, target_column = "class")
@@ -179,3 +175,4 @@ y_test <- splits$y_test
 dt_results <- train_decision_tree(X_train, y_train, X_test, y_test)
 rf_results <- train_random_forest(X_train, y_train, X_test, y_test)
 knn_results <- train_knn(X_train, y_train, X_test, y_test, k = 5)
+
